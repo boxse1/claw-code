@@ -4320,6 +4320,10 @@ fn run_repl(
                 if trimmed.is_empty() {
                     continue;
                 }
+                if matches!(trimmed.as_str(), "/" | "/?") {
+                    println!("{}", render_repl_command_menu());
+                    continue;
+                }
                 if matches!(trimmed.as_str(), "/exit" | "/quit") {
                     cli.persist_session()?;
                     break;
@@ -4932,21 +4936,15 @@ impl LiveCli {
             |path| path.display().to_string(),
         );
         format!(
-            "\x1b[38;5;196m\
- ██████╗██╗      █████╗ ██╗    ██╗\n\
-██╔════╝██║     ██╔══██╗██║    ██║\n\
-██║     ██║     ███████║██║ █╗ ██║\n\
-██║     ██║     ██╔══██║██║███╗██║\n\
-╚██████╗███████╗██║  ██║╚███╔███╔╝\n\
- ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\x1b[0m \x1b[38;5;208mCode\x1b[0m 🦞\n\n\
-  \x1b[2mModel\x1b[0m            {}\n\
-  \x1b[2mPermissions\x1b[0m      {}\n\
-  \x1b[2mBranch\x1b[0m           {}\n\
-  \x1b[2mWorkspace\x1b[0m        {}\n\
-  \x1b[2mDirectory\x1b[0m        {}\n\
-  \x1b[2mSession\x1b[0m          {}\n\
-  \x1b[2mAuto-save\x1b[0m        {}\n\n\
-  Type \x1b[1m/help\x1b[0m for commands · \x1b[1m/status\x1b[0m for live context · \x1b[2m/resume latest\x1b[0m jumps back to the newest session · \x1b[1m/diff\x1b[0m then \x1b[1m/commit\x1b[0m to ship · \x1b[2mTab\x1b[0m for workflow completions · \x1b[2mShift+Enter\x1b[0m for newline",
+            "\x1b[1mClaw Code\x1b[0m\n\
+  \x1b[2mModel\x1b[0m        {}\n\
+  \x1b[2mPermissions\x1b[0m  {}\n\
+  \x1b[2mBranch\x1b[0m       {}\n\
+  \x1b[2mWorkspace\x1b[0m    {}\n\
+  \x1b[2mDirectory\x1b[0m    {}\n\
+  \x1b[2mSession\x1b[0m      {}\n\
+  \x1b[2mAuto-save\x1b[0m    {}\n\n\
+  \x1b[2m/ for commands | /status for context | Ctrl-C to exit\x1b[0m",
             self.model,
             self.permission_mode.as_str(),
             git_branch,
@@ -5001,7 +4999,7 @@ impl LiveCli {
         let mut spinner = Spinner::new();
         let mut stdout = io::stdout();
         spinner.tick(
-            "🦀 Thinking...",
+            "Thinking...",
             TerminalRenderer::new().color_theme(),
             &mut stdout,
         )?;
@@ -5012,7 +5010,7 @@ impl LiveCli {
             Ok(summary) => {
                 self.replace_runtime(runtime)?;
                 spinner.finish(
-                    "✨ Done",
+                    "Done",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
@@ -5033,7 +5031,7 @@ impl LiveCli {
             Err(error) => {
                 runtime.shutdown_plugins()?;
                 spinner.fail(
-                    "❌ Request failed",
+                    "Request failed",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
@@ -6304,6 +6302,8 @@ fn session_clear_backup_path(session_path: &Path) -> PathBuf {
 fn render_repl_help() -> String {
     [
         "REPL".to_string(),
+        "  /                    Show the compact command menu".to_string(),
+        "  /?                   Show the compact command menu".to_string(),
         "  /exit                Quit the REPL".to_string(),
         "  /quit                Quit the REPL".to_string(),
         "  Up/Down              Navigate prompt history".to_string(),
@@ -6323,6 +6323,27 @@ fn render_repl_help() -> String {
         "
 ",
     )
+}
+
+fn render_repl_command_menu() -> String {
+    [
+        "Slash command menu",
+        "  /help          Full command list",
+        "  /status        Current session and workspace",
+        "  /diff          Current git diff",
+        "  /model         Show or switch model",
+        "  /permissions   Show or switch permission mode",
+        "  /mcp           MCP server status",
+        "  /skills        Available skills",
+        "  /agents        Available agents",
+        "  /session list  Browse saved sessions",
+        "  /history       Prompt history",
+        "  /doctor        Diagnose setup",
+        "  /exit          Quit",
+        "",
+        "Tip: type / then press Tab to complete commands.",
+    ]
+    .join("\n")
 }
 
 fn print_status_snapshot(
@@ -10206,8 +10227,9 @@ mod tests {
         parse_history_count, permission_policy, print_help_to, push_output_block,
         render_config_report, render_diff_report, render_diff_report_for, render_help_topic,
         render_help_topic_json, render_memory_report, render_prompt_history_report,
-        render_repl_help, render_resume_usage, render_session_list, render_session_markdown,
-        resolve_model_alias, resolve_model_alias_with_config, resolve_repl_model,
+        render_repl_command_menu, render_repl_help, render_resume_usage, render_session_list,
+        render_session_markdown, resolve_model_alias, resolve_model_alias_with_config,
+        resolve_repl_model,
         resolve_session_reference, response_to_events, resume_supported_slash_commands,
         run_resume_command, short_tool_id, slash_command_completion_candidates_with_sessions,
         split_error_hint, status_context, status_json_value, summarize_tool_payload_for_markdown,
@@ -12825,7 +12847,7 @@ mod tests {
     }
 
     #[test]
-    fn startup_banner_mentions_workflow_completions() {
+    fn startup_banner_is_compact_and_practical() {
         let _guard = env_lock();
         // Inject dummy credentials so LiveCli can construct without real Anthropic key
         std::env::set_var("ANTHROPIC_API_KEY", "test-dummy-key-for-banner-test");
@@ -12843,11 +12865,27 @@ mod tests {
             .startup_banner()
         });
 
-        assert!(banner.contains("Tab"));
-        assert!(banner.contains("workflow completions"));
+        assert!(banner.contains("Claw Code"));
+        assert!(banner.contains("Model"));
+        assert!(banner.contains("/ for commands"));
+        assert!(banner.contains("Ctrl-C to exit"));
+        assert!(!banner.contains("████"));
+        assert!(!banner.contains("🦞"));
 
         fs::remove_dir_all(root).expect("cleanup temp dir");
         std::env::remove_var("ANTHROPIC_API_KEY");
+    }
+
+    #[test]
+    fn repl_command_menu_surfaces_common_slash_commands() {
+        let menu = render_repl_command_menu();
+
+        assert!(menu.contains("Slash command menu"));
+        assert!(menu.contains("/help"));
+        assert!(menu.contains("/status"));
+        assert!(menu.contains("/model"));
+        assert!(menu.contains("/permissions"));
+        assert!(menu.contains("Tab"));
     }
 
     #[test]
