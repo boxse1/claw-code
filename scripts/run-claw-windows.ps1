@@ -10,6 +10,61 @@ $RepoRoot = Split-Path -Parent $ScriptDir
 $RustDir = Join-Path $RepoRoot "rust"
 $ClawExe = Join-Path $RustDir "target\debug\claw.exe"
 
+function Import-ClaudeSettingsEnv {
+    $settingsPath = Join-Path $env:USERPROFILE ".claude\settings.json"
+    if (-not (Test-Path -LiteralPath $settingsPath)) {
+        return
+    }
+
+    try {
+        $settings = Get-Content -Raw -LiteralPath $settingsPath | ConvertFrom-Json
+    } catch {
+        Write-Warning "Failed to read Claude settings env from ${settingsPath}: $($_.Exception.Message)"
+        return
+    }
+
+    if (-not $settings.env) {
+        return
+    }
+
+    foreach ($property in $settings.env.PSObject.Properties) {
+        $name = $property.Name
+        $value = [string]$property.Value
+        if ([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrEmpty($value)) {
+            continue
+        }
+
+        if ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($name, "Process"))) {
+            [Environment]::SetEnvironmentVariable($name, $value, "Process")
+        }
+    }
+}
+
+function Test-BroadCwd {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $broadPaths = @(
+        [System.IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\'),
+        [System.IO.Path]::GetPathRoot($fullPath).TrimEnd('\')
+    )
+
+    return $broadPaths -contains $fullPath
+}
+
+function Test-HasExplicitCwdOverride {
+    param(
+        [string[]]$Args
+    )
+
+    return $Args -contains "--allow-broad-cwd"
+}
+
+Import-ClaudeSettingsEnv
+
 if (-not (Test-Path -LiteralPath $ClawExe)) {
     Push-Location $RustDir
     try {
@@ -23,10 +78,12 @@ if (-not (Test-Path -LiteralPath $ClawExe)) {
     throw "claw.exe was not found after build: $ClawExe"
 }
 
-Push-Location $RustDir
-try {
-    & $ClawExe @ClawArgs
-    exit $LASTEXITCODE
-} finally {
-    Pop-Location
+$OriginalLocation = (Get-Location).Path
+$ShouldAllowBroadCwd = (Test-BroadCwd -Path $OriginalLocation) -and -not (Test-HasExplicitCwdOverride -Args $ClawArgs)
+
+if ($ShouldAllowBroadCwd) {
+    $ClawArgs = @("--allow-broad-cwd") + $ClawArgs
 }
+
+& $ClawExe @ClawArgs
+exit $LASTEXITCODE

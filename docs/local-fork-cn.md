@@ -23,7 +23,23 @@ upstream = https://github.com/ultraworkers/claw-code.git
 
 ## 启动方式
 
-从仓库根目录运行：
+已经额外安装了 PATH 启动器，日常直接运行：
+
+```powershell
+claw
+claw --help
+claw status --output-format json
+claw doctor
+claw prompt "只回复 OK"
+```
+
+备用命令：
+
+```powershell
+claw-code
+```
+
+也可以从仓库根目录运行源码脚本：
 
 ```powershell
 .\scripts\run-claw-windows.ps1 --help
@@ -31,7 +47,16 @@ upstream = https://github.com/ultraworkers/claw-code.git
 .\scripts\run-claw-windows.ps1 doctor
 ```
 
-这个脚本不会修改系统 PATH。如果 `claw.exe` 不存在，它会先在 `rust/` 目录执行一次构建。
+这个脚本不会修改系统 PATH。如果 `claw.exe` 不存在，它会先在 `rust/` 目录执行一次构建。脚本会把 `C:\Users\ROG\.claude\settings.json` 里的 `env` 配置注入到当前子进程环境中，方便复用现有 Claude/ClawGod 凭据，但不会打印或持久化密钥。
+
+如果从 `C:\Users\ROG` 或磁盘根目录这种过大的目录直接运行 `claw`，启动器会自动追加 `--allow-broad-cwd`，保持当前目录不变。这是为了让它更接近 `claude` 的启动体验。
+
+做具体项目时，先进入项目目录再运行 `claw`，例如：
+
+```powershell
+cd F:\洪荒
+claw
+```
 
 ## 开发建议
 
