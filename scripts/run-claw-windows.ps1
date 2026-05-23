@@ -63,7 +63,37 @@ function Test-HasExplicitCwdOverride {
     return $Args -contains "--allow-broad-cwd"
 }
 
+function Set-OpenAiCompatFallbackEnv {
+    $model = [Environment]::GetEnvironmentVariable("ANTHROPIC_MODEL", "Process")
+    if ([string]::IsNullOrWhiteSpace($model) -or -not ($model -match '^(openai/)?gpt[-_]|^gpt[-_]')) {
+        return
+    }
+
+    if ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable("OPENAI_API_KEY", "Process"))) {
+        $token = [Environment]::GetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "Process")
+        if ([string]::IsNullOrEmpty($token)) {
+            $token = [Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "Process")
+        }
+        if (-not [string]::IsNullOrEmpty($token)) {
+            [Environment]::SetEnvironmentVariable("OPENAI_API_KEY", $token, "Process")
+        }
+    }
+
+    if ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable("OPENAI_BASE_URL", "Process"))) {
+        $baseUrl = [Environment]::GetEnvironmentVariable("ANTHROPIC_BASE_URL", "Process")
+        if (-not [string]::IsNullOrWhiteSpace($baseUrl)) {
+            $baseUrl = $baseUrl.TrimEnd("/")
+            if (-not ($baseUrl -match "/v1$")) {
+                $baseUrl = "$baseUrl/v1"
+            }
+            [Environment]::SetEnvironmentVariable("OPENAI_BASE_URL", $baseUrl, "Process")
+        }
+    }
+}
+
 Import-ClaudeSettingsEnv
+$ClawArgs = @($ClawArgs | Where-Object { -not [string]::IsNullOrEmpty($_) })
+Set-OpenAiCompatFallbackEnv
 
 if (-not (Test-Path -LiteralPath $ClawExe)) {
     Push-Location $RustDir
