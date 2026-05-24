@@ -6,10 +6,13 @@
 
 这次改造的目标是让本地 `claw` 终端体验更接近 Claude Code 的使用感觉:
 
-- 启动页更安静, 不再显示大 ASCII Logo 和装饰 emoji。
-- 首屏直接显示目录, 分支, 工作区状态, 权限模式, 会话和自动保存路径。
-- 输入 `/` 或 `/?` 可以打开常用命令面板, 不需要先记住完整命令。
-- `/help` 顶部增加高频命令和快捷键说明, 后面仍保留完整 slash command 列表。
+- 启动页改成盒状欢迎面板, 显示 `Claw Code` 和 `Claude-style local agent`。
+- 首屏直接显示模型, 目录, 分支, 工作区状态, 权限模式, 会话和自动保存路径。
+- REPL 输入提示改成 `│ >` 样式, 更接近 Claude Code 的终端交互观感。
+- 状态行改成 `status ready · model ... · provider ...`。
+- 输入 `/` 或 `/?` 会打开盒状常用命令面板, 不需要先记住完整命令。
+- `/help` 顶部按 Common / Workspace / Session / Keyboard 分组, 后面仍保留完整 slash command 列表。
+- 工具调用框改成 `tool: name` 风格, 去掉读写/搜索 emoji。
 - 等待, 完成, 失败提示改成普通文本, 减少终端噪音。
 
 这不是复制闭源 Claude Code 的界面, 而是在当前开源 Claw Code 架构上做可维护的本地体验优化。
@@ -46,12 +49,13 @@
 cargo.exe test -p rusty-claude-cli --bin claw repl_help_includes_shared_commands_and_exit
 cargo.exe test -p rusty-claude-cli --bin claw repl_command_palette_surfaces_common_claude_like_shortcuts
 cargo.exe test -p rusty-claude-cli --bin claw startup_banner_is_compact_and_mentions_shortcuts
+cargo.exe test -p rusty-claude-cli --bin claw format_connected_line
 cargo.exe build --workspace
 claw status --output-format json
 claw
 ```
 
-真实 REPL 验证中, 输入 `/` 能显示常用命令面板, 输入 `/exit` 能正常退出。
+真实 REPL 验证中, 启动页显示盒状欢迎面板和 `│ >` 输入提示, 输入 `/` 能显示盒状常用命令面板, 输入 `/exit` 能正常退出。
 
 ## 已知非本次处理项
 

@@ -1695,7 +1695,7 @@ fn provider_label(kind: ProviderKind) -> &'static str {
 
 fn format_connected_line(model: &str) -> String {
     let provider = provider_label(detect_provider_kind(model));
-    format!("Connected: {model} via {provider}")
+    format!("\x1b[2mstatus\x1b[0m ready · \x1b[2mmodel\x1b[0m {model} · \x1b[2mprovider\x1b[0m {provider}")
 }
 
 fn filter_tool_specs(
@@ -4312,8 +4312,10 @@ fn run_repl(
     let resolved_model = resolve_repl_model(model);
     let mut cli = LiveCli::new(resolved_model, true, allowed_tools, permission_mode)?;
     cli.set_reasoning_effort(reasoning_effort);
-    let mut editor =
-        input::LineEditor::new("> ", cli.repl_completion_candidates().unwrap_or_default());
+    let mut editor = input::LineEditor::new(
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m>\x1b[0m ",
+        cli.repl_completion_candidates().unwrap_or_default(),
+    );
     println!("{}", cli.startup_banner());
     println!("{}", format_connected_line(&cli.model));
 
@@ -4941,20 +4943,25 @@ impl LiveCli {
             |path| path.display().to_string(),
         );
         format!(
-            "\x1b[1mClaw Code\x1b[0m\n\n\
-  \x1b[2mDirectory\x1b[0m        {}\n\
-  \x1b[2mBranch\x1b[0m           {}\n\
-  \x1b[2mWorkspace\x1b[0m        {}\n\
-  \x1b[2mPermissions\x1b[0m      {}\n\
-  \x1b[2mSession\x1b[0m          {}\n\
-  \x1b[2mAuto-save\x1b[0m        {}\n\n\
-  \x1b[2mTry\x1b[0m \x1b[1m/\x1b[0m \x1b[2mfor shortcuts,\x1b[0m \x1b[1m/help\x1b[0m \x1b[2mfor all commands, Tab for completion, Shift+Enter for newline\x1b[0m",
-            cwd,
-            git_branch,
-            workspace,
-            self.permission_mode.as_str(),
-            self.session.id,
-            session_path,
+            "\x1b[38;5;245m╭────────────────────────────────────────────────────────────╮\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[1mClaw Code\x1b[0m                                      \x1b[2mClaude-style local agent\x1b[0m \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m├────────────────────────────────────────────────────────────┤\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mModel\x1b[0m       {model:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mDirectory\x1b[0m   {directory:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mBranch\x1b[0m      {branch:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mWorkspace\x1b[0m   {workspace:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mPermission\x1b[0m  {permission:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m│\x1b[0m \x1b[2mSession\x1b[0m     {session:<44} \x1b[38;5;245m│\x1b[0m\n\
+\x1b[38;5;245m╰────────────────────────────────────────────────────────────╯\x1b[0m\n\
+\x1b[2mAuto-save: {autosave}\x1b[0m\n\n\
+\x1b[38;5;245mTry\x1b[0m \x1b[1m/\x1b[0m \x1b[2mfor common commands,\x1b[0m \x1b[1m/help\x1b[0m \x1b[2mfor all commands, ask naturally, Tab completes, Shift+Enter inserts newline\x1b[0m",
+            model = truncate_for_summary(&self.model, 44),
+            directory = truncate_for_summary(&cwd, 44),
+            branch = truncate_for_summary(git_branch, 44),
+            workspace = truncate_for_summary(&workspace, 44),
+            permission = truncate_for_summary(self.permission_mode.as_str(), 44),
+            session = truncate_for_summary(&self.session.id, 44),
+            autosave = session_path,
         )
     }
 
@@ -6300,20 +6307,32 @@ fn session_clear_backup_path(session_path: &Path) -> PathBuf {
 
 fn render_repl_help() -> String {
     [
-        "Claw Code commands".to_string(),
-        "  /                    Show the compact command palette".to_string(),
-        "  /help                Show every available slash command".to_string(),
-        "  /status              Show live session and workspace context".to_string(),
+        "Claw Code".to_string(),
+        "  Ask naturally, or use slash commands for direct control.".to_string(),
+        String::new(),
+        "Common".to_string(),
+        "  /                    Open the command palette".to_string(),
+        "  /status              Inspect model, tokens, git, and session".to_string(),
         "  /model [model]       Show or switch the active model".to_string(),
-        "  /permissions         Show or switch permission mode".to_string(),
-        "  /diff                Show current git diff".to_string(),
-        "  /commit              Generate a commit message and commit".to_string(),
-        "  /resume latest       Resume the latest saved session".to_string(),
+        "  /permissions         Show or switch tool access".to_string(),
+        "  /clear --confirm     Start a fresh session".to_string(),
+        "  /compact             Compact session history".to_string(),
+        String::new(),
+        "Workspace".to_string(),
+        "  /diff                Review workspace changes".to_string(),
+        "  /commit              Commit current changes".to_string(),
+        "  /pr [context]        Draft or create a pull request".to_string(),
+        "  /issue [context]     Draft or create a GitHub issue".to_string(),
+        "  /mcp list            Inspect MCP servers".to_string(),
+        "  /skills help         Inspect local skills".to_string(),
+        String::new(),
+        "Session".to_string(),
+        "  /resume latest       Continue the latest saved session".to_string(),
         "  /session list        Browse saved sessions".to_string(),
         "  /history [count]     Show prompt history".to_string(),
         "  /exit or /quit       Exit".to_string(),
         String::new(),
-        "Shortcuts".to_string(),
+        "Keyboard".to_string(),
         "  Up/Down              Navigate prompt history".to_string(),
         "  Ctrl-R               Reverse-search prompt history".to_string(),
         "  Tab                  Complete commands, modes, and recent sessions".to_string(),
@@ -6332,19 +6351,17 @@ fn render_repl_help() -> String {
 
 fn render_repl_command_palette() -> String {
     [
-        "Common commands".to_string(),
-        "  /status              current model, tokens, git, and session".to_string(),
-        "  /model [model]       inspect or switch model".to_string(),
-        "  /permissions         inspect or switch tool access".to_string(),
-        "  /diff                review workspace changes".to_string(),
-        "  /commit              commit current changes".to_string(),
-        "  /clear --confirm     start a fresh session".to_string(),
-        "  /resume latest       continue the latest session".to_string(),
-        "  /session list        browse saved sessions".to_string(),
-        "  /mcp list            inspect MCP servers".to_string(),
-        "  /skills help         inspect local skills".to_string(),
-        "  /help                show every command".to_string(),
-        "  /exit                quit".to_string(),
+        "\x1b[38;5;245m╭─ Common commands ───────────────────────────────────────────╮\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/status\x1b[0m            model, token, git, and session snapshot        \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/model [model]\x1b[0m     inspect or switch model                         \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/permissions\x1b[0m       inspect or switch tool access                   \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/diff\x1b[0m              review workspace changes                       \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/commit\x1b[0m            commit current changes                         \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/resume latest\x1b[0m     continue the latest saved session               \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/session list\x1b[0m      browse saved sessions                          \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/mcp list\x1b[0m          inspect MCP servers                             \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m│\x1b[0m \x1b[1m/help\x1b[0m              show every slash command                       \x1b[38;5;245m│\x1b[0m".to_string(),
+        "\x1b[38;5;245m╰────────────────────────────────────────────────────────────╯\x1b[0m".to_string(),
     ]
     .join("\n")
 }
@@ -9314,7 +9331,7 @@ fn format_tool_call_start(name: &str, input: &str) -> String {
         "bash" | "Bash" => format_bash_call(&parsed),
         "read_file" | "Read" => {
             let path = extract_tool_path(&parsed);
-            format!("\x1b[2m📄 Reading {path}…\x1b[0m")
+            format!("\x1b[2mRead\x1b[0m {path}")
         }
         "write_file" | "Write" => {
             let path = extract_tool_path(&parsed);
@@ -9322,7 +9339,7 @@ fn format_tool_call_start(name: &str, input: &str) -> String {
                 .get("content")
                 .and_then(|value| value.as_str())
                 .map_or(0, |content| content.lines().count());
-            format!("\x1b[1;32m✏️ Writing {path}\x1b[0m \x1b[2m({lines} lines)\x1b[0m")
+            format!("\x1b[2mWrite\x1b[0m {path} \x1b[2m({lines} lines)\x1b[0m")
         }
         "edit_file" | "Edit" => {
             let path = extract_tool_path(&parsed);
@@ -9337,14 +9354,14 @@ fn format_tool_call_start(name: &str, input: &str) -> String {
                 .and_then(|value| value.as_str())
                 .unwrap_or_default();
             format!(
-                "\x1b[1;33m📝 Editing {path}\x1b[0m{}",
+                "\x1b[2mEdit\x1b[0m {path}{}",
                 format_patch_preview(old_value, new_value)
                     .map(|preview| format!("\n{preview}"))
                     .unwrap_or_default()
             )
         }
-        "glob_search" | "Glob" => format_search_start("🔎 Glob", &parsed),
-        "grep_search" | "Grep" => format_search_start("🔎 Grep", &parsed),
+        "glob_search" | "Glob" => format_search_start("Glob", &parsed),
+        "grep_search" | "Grep" => format_search_start("Grep", &parsed),
         "web_search" | "WebSearch" => parsed
             .get("query")
             .and_then(|value| value.as_str())
@@ -9353,9 +9370,9 @@ fn format_tool_call_start(name: &str, input: &str) -> String {
         _ => summarize_tool_payload(input),
     };
 
-    let border = "─".repeat(name.len() + 8);
+    let border = "─".repeat(name.len() + 10);
     format!(
-        "\x1b[38;5;245m╭─ \x1b[1;36m{name}\x1b[0;38;5;245m ─╮\x1b[0m\n\x1b[38;5;245m│\x1b[0m {detail}\n\x1b[38;5;245m╰{border}╯\x1b[0m"
+        "\x1b[38;5;245m╭─ tool: \x1b[1m{name}\x1b[0;38;5;245m ─╮\x1b[0m\n\x1b[38;5;245m│\x1b[0m {detail}\n\x1b[38;5;245m╰{border}╯\x1b[0m"
     )
 }
 
@@ -12798,7 +12815,12 @@ mod tests {
     #[test]
     fn repl_help_includes_shared_commands_and_exit() {
         let help = render_repl_help();
-        assert!(help.contains("Claw Code commands"));
+        assert!(help.contains("Claw Code"));
+        assert!(help.contains("Ask naturally"));
+        assert!(help.contains("Common"));
+        assert!(help.contains("Workspace"));
+        assert!(help.contains("Session"));
+        assert!(help.contains("Keyboard"));
         assert!(help.contains("/help"));
         assert!(help.contains("Complete commands, modes, and recent sessions"));
         assert!(help.contains("/status"));
@@ -12826,11 +12848,11 @@ mod tests {
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
         assert!(help.contains("/exit"));
-        assert!(help.contains("/                    Show the compact command palette"));
+        assert!(help.contains("/                    Open the command palette"));
         assert!(help.contains(
             "Auto-save            .claw/sessions/<workspace-fingerprint>/<session-id>.jsonl"
         ));
-        assert!(help.contains("/resume latest       Resume the latest saved session"));
+        assert!(help.contains("/resume latest       Continue the latest saved session"));
     }
 
     #[test]
@@ -12844,6 +12866,7 @@ mod tests {
         assert!(palette.contains("/commit"));
         assert!(palette.contains("/resume latest"));
         assert!(palette.contains("/help"));
+        assert!(palette.contains("╭─"));
     }
 
     #[test]
@@ -12883,8 +12906,10 @@ mod tests {
         });
 
         assert!(banner.contains("Claw Code"));
+        assert!(banner.contains("Claude-style local agent"));
+        assert!(banner.contains("Model"));
         assert!(banner.contains("Directory"));
-        assert!(banner.contains("Permissions"));
+        assert!(banner.contains("Permission"));
         assert!(!banner.contains("██████"));
         assert!(!banner.contains("🦞"));
         assert!(banner.contains("Try"));
@@ -12901,7 +12926,9 @@ mod tests {
 
         let line = format_connected_line(model);
 
-        assert_eq!(line, "Connected: claude-sonnet-4-6 via anthropic");
+        assert!(line.contains("ready"));
+        assert!(line.contains("claude-sonnet-4-6"));
+        assert!(line.contains("anthropic"));
     }
 
     #[test]
@@ -12910,7 +12937,9 @@ mod tests {
 
         let line = format_connected_line(model);
 
-        assert_eq!(line, "Connected: grok-3 via xai");
+        assert!(line.contains("ready"));
+        assert!(line.contains("grok-3"));
+        assert!(line.contains("xai"));
     }
 
     #[test]
@@ -14212,7 +14241,7 @@ UU conflicted.rs",
             r#"{"file":{"filePath":"src/main.rs","content":"hello","numLines":1,"startLine":1,"totalLines":1}}"#,
             false,
         );
-        assert!(done.contains("📄 Read src/main.rs"));
+        assert!(done.contains("Read src/main.rs"));
         assert!(done.contains("hello"));
     }
 
