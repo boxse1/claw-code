@@ -4329,6 +4329,10 @@ fn run_repl(
                     cli.persist_session()?;
                     break;
                 }
+                if matches!(trimmed.as_str(), "/" | "/?") {
+                    println!("{}", render_repl_command_palette());
+                    continue;
+                }
                 match SlashCommand::parse(&trimmed) {
                     Ok(Some(command)) => {
                         if cli.handle_repl_command(command)? {
@@ -4937,26 +4941,18 @@ impl LiveCli {
             |path| path.display().to_string(),
         );
         format!(
-            "\x1b[38;5;196m\
- ██████╗██╗      █████╗ ██╗    ██╗\n\
-██╔════╝██║     ██╔══██╗██║    ██║\n\
-██║     ██║     ███████║██║ █╗ ██║\n\
-██║     ██║     ██╔══██║██║███╗██║\n\
-╚██████╗███████╗██║  ██║╚███╔███╔╝\n\
- ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\x1b[0m \x1b[38;5;208mCode\x1b[0m 🦞\n\n\
-  \x1b[2mModel\x1b[0m            {}\n\
-  \x1b[2mPermissions\x1b[0m      {}\n\
+            "\x1b[1mClaw Code\x1b[0m\n\n\
+  \x1b[2mDirectory\x1b[0m        {}\n\
   \x1b[2mBranch\x1b[0m           {}\n\
   \x1b[2mWorkspace\x1b[0m        {}\n\
-  \x1b[2mDirectory\x1b[0m        {}\n\
+  \x1b[2mPermissions\x1b[0m      {}\n\
   \x1b[2mSession\x1b[0m          {}\n\
   \x1b[2mAuto-save\x1b[0m        {}\n\n\
-  Type \x1b[1m/help\x1b[0m for commands · \x1b[1m/status\x1b[0m for live context · \x1b[2m/resume latest\x1b[0m jumps back to the newest session · \x1b[1m/diff\x1b[0m then \x1b[1m/commit\x1b[0m to ship · \x1b[2mTab\x1b[0m for workflow completions · \x1b[2mShift+Enter\x1b[0m for newline",
-            self.model,
-            self.permission_mode.as_str(),
+  \x1b[2mTry\x1b[0m \x1b[1m/\x1b[0m \x1b[2mfor shortcuts,\x1b[0m \x1b[1m/help\x1b[0m \x1b[2mfor all commands, Tab for completion, Shift+Enter for newline\x1b[0m",
+            cwd,
             git_branch,
             workspace,
-            cwd,
+            self.permission_mode.as_str(),
             self.session.id,
             session_path,
         )
@@ -5006,7 +5002,7 @@ impl LiveCli {
         let mut spinner = Spinner::new();
         let mut stdout = io::stdout();
         spinner.tick(
-            "🦀 Thinking...",
+            "Thinking...",
             TerminalRenderer::new().color_theme(),
             &mut stdout,
         )?;
@@ -5016,11 +5012,7 @@ impl LiveCli {
         match result {
             Ok(summary) => {
                 self.replace_runtime(runtime)?;
-                spinner.finish(
-                    "✨ Done",
-                    TerminalRenderer::new().color_theme(),
-                    &mut stdout,
-                )?;
+                spinner.finish("Done", TerminalRenderer::new().color_theme(), &mut stdout)?;
                 let final_text = final_assistant_text(&summary);
                 if !final_text.is_empty() {
                     println!("{final_text}");
@@ -5038,7 +5030,7 @@ impl LiveCli {
             Err(error) => {
                 runtime.shutdown_plugins()?;
                 spinner.fail(
-                    "❌ Request failed",
+                    "Request failed",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
@@ -6308,19 +6300,27 @@ fn session_clear_backup_path(session_path: &Path) -> PathBuf {
 
 fn render_repl_help() -> String {
     [
-        "REPL".to_string(),
-        "  /exit                Quit the REPL".to_string(),
-        "  /quit                Quit the REPL".to_string(),
+        "Claw Code commands".to_string(),
+        "  /                    Show the compact command palette".to_string(),
+        "  /help                Show every available slash command".to_string(),
+        "  /status              Show live session and workspace context".to_string(),
+        "  /model [model]       Show or switch the active model".to_string(),
+        "  /permissions         Show or switch permission mode".to_string(),
+        "  /diff                Show current git diff".to_string(),
+        "  /commit              Generate a commit message and commit".to_string(),
+        "  /resume latest       Resume the latest saved session".to_string(),
+        "  /session list        Browse saved sessions".to_string(),
+        "  /history [count]     Show prompt history".to_string(),
+        "  /exit or /quit       Exit".to_string(),
+        String::new(),
+        "Shortcuts".to_string(),
         "  Up/Down              Navigate prompt history".to_string(),
         "  Ctrl-R               Reverse-search prompt history".to_string(),
         "  Tab                  Complete commands, modes, and recent sessions".to_string(),
-        "  Ctrl-C               Clear input (or exit on empty prompt)".to_string(),
+        "  Ctrl-C               Clear input, or exit on empty prompt".to_string(),
         "  Shift+Enter/Ctrl+J   Insert a newline".to_string(),
         "  Auto-save            .claw/sessions/<workspace-fingerprint>/<session-id>.jsonl"
             .to_string(),
-        "  Resume latest        /resume latest".to_string(),
-        "  Browse sessions      /session list".to_string(),
-        "  Show prompt history  /history [count]".to_string(),
         String::new(),
         render_slash_command_help_filtered(STUB_COMMANDS),
     ]
@@ -6328,6 +6328,25 @@ fn render_repl_help() -> String {
         "
 ",
     )
+}
+
+fn render_repl_command_palette() -> String {
+    [
+        "Common commands".to_string(),
+        "  /status              current model, tokens, git, and session".to_string(),
+        "  /model [model]       inspect or switch model".to_string(),
+        "  /permissions         inspect or switch tool access".to_string(),
+        "  /diff                review workspace changes".to_string(),
+        "  /commit              commit current changes".to_string(),
+        "  /clear --confirm     start a fresh session".to_string(),
+        "  /resume latest       continue the latest session".to_string(),
+        "  /session list        browse saved sessions".to_string(),
+        "  /mcp list            inspect MCP servers".to_string(),
+        "  /skills help         inspect local skills".to_string(),
+        "  /help                show every command".to_string(),
+        "  /exit                quit".to_string(),
+    ]
+    .join("\n")
 }
 
 fn print_status_snapshot(
@@ -10211,16 +10230,17 @@ mod tests {
         parse_history_count, permission_policy, print_help_to, push_output_block,
         render_config_report, render_diff_report, render_diff_report_for, render_help_topic,
         render_help_topic_json, render_memory_report, render_prompt_history_report,
-        render_repl_help, render_resume_usage, render_session_list, render_session_markdown,
-        resolve_model_alias, resolve_model_alias_with_config, resolve_repl_model,
-        resolve_session_reference, response_to_events, resume_supported_slash_commands,
-        run_resume_command, short_tool_id, slash_command_completion_candidates_with_sessions,
-        split_error_hint, status_context, status_json_value, summarize_tool_payload_for_markdown,
-        try_resolve_bare_skill_prompt, validate_no_args, write_mcp_server_fixture, CliAction,
-        CliOutputFormat, CliToolExecutor, GitWorkspaceSummary, InternalPromptProgressEvent,
-        InternalPromptProgressState, LiveCli, LocalHelpTopic, PromptHistoryEntry,
-        SessionLifecycleKind, SessionLifecycleSummary, SlashCommand, StatusUsage, TmuxPaneSnapshot,
-        DEFAULT_MODEL, LATEST_SESSION_REFERENCE, STUB_COMMANDS,
+        render_repl_command_palette, render_repl_help, render_resume_usage, render_session_list,
+        render_session_markdown, resolve_model_alias, resolve_model_alias_with_config,
+        resolve_repl_model, resolve_session_reference, response_to_events,
+        resume_supported_slash_commands, run_resume_command, short_tool_id,
+        slash_command_completion_candidates_with_sessions, split_error_hint, status_context,
+        status_json_value, summarize_tool_payload_for_markdown, try_resolve_bare_skill_prompt,
+        validate_no_args, write_mcp_server_fixture, CliAction, CliOutputFormat, CliToolExecutor,
+        GitWorkspaceSummary, InternalPromptProgressEvent, InternalPromptProgressState, LiveCli,
+        LocalHelpTopic, PromptHistoryEntry, SessionLifecycleKind, SessionLifecycleSummary,
+        SlashCommand, StatusUsage, TmuxPaneSnapshot, DEFAULT_MODEL, LATEST_SESSION_REFERENCE,
+        STUB_COMMANDS,
     };
     use api::{ApiError, MessageResponse, OutputContentBlock, Usage};
     use plugins::{
@@ -12778,7 +12798,7 @@ mod tests {
     #[test]
     fn repl_help_includes_shared_commands_and_exit() {
         let help = render_repl_help();
-        assert!(help.contains("REPL"));
+        assert!(help.contains("Claw Code commands"));
         assert!(help.contains("/help"));
         assert!(help.contains("Complete commands, modes, and recent sessions"));
         assert!(help.contains("/status"));
@@ -12806,10 +12826,24 @@ mod tests {
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
         assert!(help.contains("/exit"));
+        assert!(help.contains("/                    Show the compact command palette"));
         assert!(help.contains(
             "Auto-save            .claw/sessions/<workspace-fingerprint>/<session-id>.jsonl"
         ));
-        assert!(help.contains("Resume latest        /resume latest"));
+        assert!(help.contains("/resume latest       Resume the latest saved session"));
+    }
+
+    #[test]
+    fn repl_command_palette_surfaces_common_claude_like_shortcuts() {
+        let palette = render_repl_command_palette();
+        assert!(palette.contains("Common commands"));
+        assert!(palette.contains("/status"));
+        assert!(palette.contains("/model [model]"));
+        assert!(palette.contains("/permissions"));
+        assert!(palette.contains("/diff"));
+        assert!(palette.contains("/commit"));
+        assert!(palette.contains("/resume latest"));
+        assert!(palette.contains("/help"));
     }
 
     #[test]
@@ -12830,7 +12864,7 @@ mod tests {
     }
 
     #[test]
-    fn startup_banner_mentions_workflow_completions() {
+    fn startup_banner_is_compact_and_mentions_shortcuts() {
         let _guard = env_lock();
         // Inject dummy credentials so LiveCli can construct without real Anthropic key
         std::env::set_var("ANTHROPIC_API_KEY", "test-dummy-key-for-banner-test");
@@ -12848,8 +12882,14 @@ mod tests {
             .startup_banner()
         });
 
+        assert!(banner.contains("Claw Code"));
+        assert!(banner.contains("Directory"));
+        assert!(banner.contains("Permissions"));
+        assert!(!banner.contains("██████"));
+        assert!(!banner.contains("🦞"));
+        assert!(banner.contains("Try"));
+        assert!(banner.contains("/help"));
         assert!(banner.contains("Tab"));
-        assert!(banner.contains("workflow completions"));
 
         fs::remove_dir_all(root).expect("cleanup temp dir");
         std::env::remove_var("ANTHROPIC_API_KEY");
