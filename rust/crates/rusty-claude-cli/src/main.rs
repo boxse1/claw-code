@@ -673,7 +673,12 @@ impl CliOutputFormat {
 
 #[allow(clippy::too_many_lines)]
 fn parse_args(args: &[String]) -> Result<CliAction, String> {
-    let mut model = DEFAULT_MODEL.to_string();
+    let mut model = env::var("ANTHROPIC_MODEL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| resolve_model_alias_with_config(&value))
+        .unwrap_or_else(|| DEFAULT_MODEL.to_string());
     // #148: when user passes --model/--model=, capture the raw input so we
     // can attribute source: "flag" later. None means no flag was supplied.
     let mut model_flag_raw: Option<String> = None;
